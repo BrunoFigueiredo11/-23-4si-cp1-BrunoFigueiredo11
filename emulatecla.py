@@ -6,6 +6,7 @@
 import cv2
 import os,sys, os.path
 import numpy as np
+import math
 
 #importes para emular precionamento de teclas
 from pynput.keyboard import Key, Controller
@@ -61,15 +62,13 @@ def escreve_texto(img, text, origem, color):
 
 
 def image_da_webcam(img):
-    """
-    ->>> !!!! FECHE A JANELA COM A TECLA ESC !!!! <<<<-
-        deve receber a imagem da camera e retornar uma imagems filtrada.
-    """  
+ 
     mask_hsv1 = filtro_de_cor(img, np.array([140, 130, 100])  , np.array([180, 255, 255])) #rosa
-    mask_hsv2 = filtro_de_cor(img, np.array([20, 60,90])  , np.array([102, 255, 255]))#amarelo OK
+    mask_hsv2 = filtro_de_cor(img, np.array([18, 60,90]) , np.array([102, 255, 255]))#amarelo OK
     mask_hsv3 = filtro_de_cor(img, np.array([18, 80, 130])  , np.array([40, 255, 255]))#Mostarda
+    mask_hsv4 = filtro_de_cor(img, np.array([80, 200, 180])  , np.array([180, 255, 255])) #rosa
     
-    mask_hsv = mascara_or(mask_hsv1, mask_hsv2,mask_hsv3)
+    mask_hsv = mascara_or(mask_hsv1, mask_hsv2,mask_hsv3,mask_hsv4)
 
     contornos, _ = cv2.findContours(mask_hsv, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
     
@@ -78,39 +77,43 @@ def image_da_webcam(img):
     
     maior = None
     maior_area = 0
-    for c in contornos:
-        area = cv2.contourArea(c)
-        
-        if area > maior_area:
-            maior_area = area
-            maior = c
-            
-    escreve_texto(contornos_img, maior_area, (250,250), (255,255,0)) #maior area - informa o valor da area
-    if maior_area >=20000:
-        #escreve no teclado
-        texto = 'Perto W'
-        origem = (200,50)
-        escreve_texto(contornos_img, texto, origem, (0,0,255))
-
-    elif maior_area <= 2000:
-        texto = 'Muito longe nao escreve'
-        origem = (200,50)
-        escreve_texto(contornos_img, texto, origem, (0,0,255))
-    else:
-        texto = 'Longe S'
-        origem = (200,50)
-        escreve_texto(contornos_img, texto, origem, (0,0,255))
-        
+    maior2_area = 0
+    maior2 = None
+    listArea = []
+    for i in range (len(contornos)):
+     listArea.append(contornos[i])
+    for c in range (2):                
+       listArea.sort(key=lambda listArea: cv2.contourArea(listArea),reverse=True)
+       maior_area = int(cv2.contourArea(listArea[0]))
+       maior= listArea[0]
+       maior2_area = int(cv2.contourArea(listArea[1]))
+       maior2= listArea[1]
+    
+ 
     M = cv2.moments(maior)
+    M2 = cv2.moments(maior2)
 
     # Verifica se existe alguma para calcular, se sim calcula e exibe no display
     if M["m00"] != 0:
         cX = int(M["m10"] / M["m00"])
         cY = int(M["m01"] / M["m00"])
+        cX2 = int(M2["m10"] / M2["m00"])
+        cY2= int(M2["m01"] / M2["m00"])
         cv2.drawContours(contornos_img, [maior], -1, [255, 0, 0], 5)
-       
+        cv2.drawContours(contornos_img, [maior2], -1, [255, 0, 0], 5)
+        cv2.line(contornos_img, (cX, cY), (cX2,cY2 ), (40, 255, 0), 5)
         #faz a cruz no centro de massa
         desenha_cruz(contornos_img, cX,cY, 20, (0,0,255))
+        desenha_cruz(contornos_img, cX2,cY2, 20, (0,0,255))
+
+        escreve_texto(contornos_img, maior_area, ((cX-50),(cY-100)), (50,255,0)) #maior area - informa o valor da area
+        escreve_texto(contornos_img, maior2_area, ((cX2-50),(cY2-100)), (50,255,0)) #maior area - informa o valor da area
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        angulo= ((cY-cY2)/(cX-cX2))
+        value=math.degrees(math.atan(angulo))
+        text=str(int(value*-1))
+        cv2.putText(contornos_img, str(text+'Graus'), (cY+40,cX), font,1,(0,0,254),2,cv2.LINE_AA)
             
     else:
     # se não existe nada para segmentar
